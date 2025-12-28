@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ловец мандаринов</title>
+<style>
+    * {margin:0; padding:0; box-sizing:border-box;}
+    body {display:flex; justify-content:center; align-items:center; height:100vh; background:#000;}
+    canvas {background:#fff; display:block; border:2px solid #000;}
+    #gameOver {
+        position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);
+        background:rgba(0,0,0,0.8); color:#fff; padding:20px; text-align:center; font-family:sans-serif;
+        display:none; border-radius:10px;
+    }
+    #restartBtn {
+        padding:10px 20px; margin-top:10px; font-size:16px; cursor:pointer; border:none; border-radius:5px;
+        background:#ffa500; color:#000;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="700"></canvas>
+
+<div id="gameOver">
+    <h2>Игра окончена!</h2>
+    <p>Рекорд: <span id="finalScore">0</span></p>
+    <button id="restartBtn">Начать заново</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+
+// ==== Изображения (ты сюда добавишь свои PNG) ====
+const playerImg = new Image();
+playerImg.src = 'https://psv4.userapi.com/s/v1/d2/2fpfpcTOo0VkOEdK1FiV1QIO8-30alLPaTsIrB_uKm9pdEY_cHh7NMrbmZhLkYtHoEFNrtPaus_3cb4H3XD5KMH7Na3IWM6w9SfiMBz2-POSTrghXYog5gkUvvl69yFFHP_H7xZEVA0S/player.png'; // сюда твой PNG персонажа
+
+const bgImg = new Image();
+bgImg.src = 'https://sun9-47.userapi.com/s/v1/ig2/RNsrE3BWGMcjNrE0h4QmszdP2aGuGfuEl14XZL9xzr1aVvthS_S496L9V8cGQeXPdgHrMZ6mDmrXD79VmMrsHoER.jpg?quality=95&as=32x48,48x72,72x108,108x162,160x240,240x360,360x540,480x720,540x810,640x960,720x1080,1024x1536&from=bu&cs=1024x0'; // сюда твой фон
+
+const mandarinImg = new Image();
+mandarinImg.src = 'https://psv4.userapi.com/s/v1/d2/Bp5hHNcWRNtiCsyI0TVjzAz0xvo-EZEU5spc8jp-Zf0qQPI7-aVIfYX326qe_pvyI4BoKB_zLYRsKzM4vn2_5wx66HOK3adZThbKkGg5UJiJPS_v9sTPKAObNoQ4S94MBFE1KojpyW-T/mandarin.png'; // сюда PNG мандарина
+
+// ==== Игровые переменные ====
+let player = { x: WIDTH/2 - 25, y: HEIGHT - 100, width:80, height:120, speed:7 };
+let mandarins = [];
+let score = 0;
+let highScore = localStorage.getItem('mandarinHighScore') || 0;
+let lives = 5;
+let gameOver = false;
+
+// ==== Управление ====
+let keys = {};
+document.addEventListener('keydown', e => { keys[e.key] = true; });
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Сенсор для мобилок
+canvas.addEventListener('touchmove', e => {
+    let touch = e.touches[0];
+    let rect = canvas.getBoundingClientRect();
+    player.x = touch.clientX - rect.left - player.width/2;
+    if(player.x < 0) player.x = 0;
+    if(player.x + player.width > WIDTH) player.x = WIDTH - player.width;
+});
+
+// ==== Функции ====
+function spawnMandarin() {
+    let x = Math.random() * (WIDTH - 40);
+    mandarins.push({ x: x, y: -50, width:40, height:40, speed:3 + Math.random()*2 });
+}
+
+function update() {
+    if(gameOver) return;
+
+    // Движение игрока
+    if(keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+    if(keys['ArrowRight'] || keys['d']) player.x += player.speed;
+    if(player.x < 0) player.x = 0;
+    if(player.x + player.width > WIDTH) player.x = WIDTH - player.width;
+
+    // Движение мандаринов
+    for(let i = mandarins.length - 1; i >= 0; i--){
+        let m = mandarins[i];
+        m.y += m.speed;
+
+        // Проверка столкновения
+        if(m.y + m.height >= player.y && m.y <= player.y + player.height &&
+           m.x + m.width >= player.x && m.x <= player.x + player.width){
+            score++;
+            mandarins.splice(i,1);
+        } else if(m.y > HEIGHT){
+            mandarins.splice(i,1);
+            lives--;
+            if(lives <= 0) endGame();
+        }
+    }
+
+    // Спавн мандаринов каждые 60 кадров (~1 сек)
+    if(Math.random() < 0.02) spawnMandarin();
+}
+
+function draw() {
+    // Фон
+    ctx.clearRect(0,0,WIDTH,HEIGHT);
+    ctx.drawImage(bgImg, 0, 0, WIDTH, HEIGHT);
+
+    // Игрок
+    ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+
+    // Мандарины
+    mandarins.forEach(m => ctx.drawImage(mandarinImg, m.x, m.y, m.width, m.height));
+
+    // Счёт
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px sans-serif';
+    ctx.fillText('Счёт: ' + score, 10, 30);
+    ctx.fillText('Рекорд: ' + highScore, 10, 60);
+    ctx.fillText('Жизни: ' + lives, 10, 90);
+}
+
+function gameLoop() {
+    update();
+    draw();
+    if(!gameOver) requestAnimationFrame(gameLoop);
+}
+
+function endGame() {
+    gameOver = true;
+    if(score > highScore){
+        highScore = score;
+        localStorage.setItem('mandarinHighScore', highScore);
+    }
+    document.getElementById('finalScore').innerText = score;
+    document.getElementById('gameOver').style.display = 'block';
+}
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+    // Сброс игры
+    score = 0;
+    lives = 5;
+    mandarins = [];
+    gameOver = false;
+    document.getElementById('gameOver').style.display = 'none';
+    gameLoop();
+});
+
+// Старт игры
+gameLoop();
+</script>
+</body>
+</html>
